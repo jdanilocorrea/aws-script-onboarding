@@ -29,25 +29,26 @@ function add_user_to_group {
 
 # Função para exibir acesso do usuário e baixar arquivo
 function display_and_download {
-  echo "-------------------DOWNLOAD-------------------------------"
+  echo "------------DOWNLOAD CONSOLE ACCESS------------------------"
   display_message "Exibindo acesso e criando arquivo..."
-  echo -e "Acesso ao Console AWS:"
-  echo -e "Usuário: $1\nSenha: $2\nGrupo: $3"
+  echo -e "Acesso ao Console AWS:" | tee -a $1-console-aws-acesso.txt
+  echo -e "Usuário: $1\nSenha: $2\nGrupo: $3" | tee -a $1-console-aws-acesso.txt
   if aws iam list-access-keys --user-name "$1" 2>/dev/null; then
     display_message "Chaves de acesso listadas com sucesso."
   else
     display_message "Falha ao listar chaves de acesso para o usuário $1."
   fi
-  if aws iam create-login-profile --user-name "$1" --password-reset-required --query 'LoginProfile.[UserName, LoginProfile.Password, LoginProfile.CreateDate]' --output csv > usuario_acesso.csv 2>/dev/null; then
-    display_message "Arquivo CSV gerado com sucesso."
-  else
-    display_message "Falha ao gerar arquivo CSV para o usuário $1."
-  fi
-  echo "-----------------------------------------------------------"
+  # if aws iam create-login-profile --user-name "$1" --password-reset-required --query 'LoginProfile.[UserName, LoginProfile.Password, LoginProfile.CreateDate]' --output csv > usuario_acesso.csv 2>/dev/null; then
+  #   display_message "Arquivo CSV gerado com sucesso."
+  # else
+  #   display_message "Falha ao gerar arquivo para o usuário $1."
+  # fi
+
 }
 
 # Função para criar acesso ao console AWS com senha gerada automaticamente
 function create_console_access {
+  echo "------------CREATE CONSOLE ACCESS--------------------------"
   display_message "Adicionando acesso ao console AWS para o usuário $1..."
   AUTOSENHA=$(openssl rand -base64 12 | tr -dc 'a-zA-Z0-9' | fold -w 1 | shuf | head -n 1)$(openssl rand -base64 11)
   LOGIN_PROFILE=$(aws iam create-login-profile --user-name "$1" --password-reset-required --password "$AUTOSENHA" 2>/dev/null)
@@ -58,8 +59,8 @@ function create_console_access {
     echo "============================================"
     echo "=============AWS CONSOLE ENABLED============"
     echo "============================================"
-    echo "==========Usuário: $USER_CONSOLE============"
-    echo "==========Senha: $PASSWORD_CONSOLE=========="
+    echo "==============USER: test.test==============="
+    echo "==============PASSWORD: null================"
     echo "============================================"
     display_and_download "$1" "$AUTOSENHA" "$2"
   else
@@ -67,8 +68,23 @@ function create_console_access {
   fi
 }
 
+# Função para exibir acesso ao AWS CLI e baixar arquivo CSV
+function display_cli_and_download {
+  echo "------------DOWNLOAD AWS-CLI ACCESS-------------------------"
+  display_message "Exibindo acesso ao AWS CLI e baixando arquivo..."
+  echo -e "Acesso ao AWS CLI:" | tee -a $1-aws-cli-acesso.txt
+  echo -e "Usuário: $1\nChave de Acesso: $(aws configure get aws_access_key_id --profile "$1" 2>/dev/null)\nChave Secreta: $(aws configure get aws_secret_access_key --profile "$1" 2>/dev/null)" | tee -a $1-aws-cli-acesso.txt
+  # if aws configure list-profiles --output table --profile "$1" > usuario_acesso_cli.csv 2>/dev/null; then
+  #   display_message "Arquivo do AWS CLI gerado com sucesso."
+  # else
+  #   display_message "Falha ao gerar arquivo CSV do AWS CLI para o usuário $1."
+  # fi
+}
+
+
 # Função para criar acesso ao AWS CLI para o usuário
 function create_cli_access {
+  echo "------------CREATE AWS-CLI ACCESS---------------------------"
   display_message "Criando acesso ao AWS CLI para o usuário $1..."
   
   # Chama o comando uma vez e armazena o resultado nas variáveis
@@ -83,6 +99,9 @@ function create_cli_access {
     if aws configure set aws_access_key_id "$ACCESS_KEY" --profile "$1" && \
        aws configure set aws_secret_access_key "$SECRET_KEY" --profile "$1"; then
       display_message "Chaves de acesso do AWS CLI configuradas com sucesso."
+
+      display_cli_and_download "$1"
+
     else
       display_message "Falha ao configurar chaves de acesso do AWS CLI para o usuário $1."
     fi
@@ -91,17 +110,7 @@ function create_cli_access {
   fi
 }
 
-# Função para exibir acesso ao AWS CLI e baixar arquivo CSV
-function display_cli_and_download {
-  display_message "Exibindo acesso ao AWS CLI e baixando arquivo..."
-  echo -e "Acesso ao AWS CLI:"
-  echo -e "Usuário: $1\nChave de Acesso: $(aws configure get aws_access_key_id --profile "$1" 2>/dev/null)\nChave Secreta: $(aws configure get aws_secret_access_key --profile "$1" 2>/dev/null)"
-  if aws configure list-profiles --output table --profile "$1" > usuario_acesso_cli.csv 2>/dev/null; then
-    display_message "Arquivo CSV do AWS CLI gerado com sucesso."
-  else
-    display_message "Falha ao gerar arquivo CSV do AWS CLI para o usuário $1."
-  fi
-}
+
 
 # Verificar número de argumentos
 if [ "$#" -ne 2 ]; then
@@ -117,10 +126,11 @@ GRUPO="$2"
 create_user "$USUARIO"
 add_user_to_group "$USUARIO" "$GRUPO"
 create_console_access "$USUARIO" "$GRUPO"
-echo "wait to..."
-sleep 5ource
+echo "Wait to..."
+sleep 5
 create_cli_access "$USUARIO"
-display_cli_and_download "$USUARIO"
+
+echo "------------INFO GENERAL RESULTS----------------------------"
 
 # Exibir acesso do usuário e baixar arquivo CSV
 display_message "Exibindo acesso do usuário e baixando arquivo CSV..."
@@ -131,7 +141,3 @@ echo -e "Usuário: $USUARIO\nSenha: $LOGIN_PROFILE\nGrupo: $GRUPO"
 echo -e "\nChaves de Acesso:"
 # Listar Access Key ID associada ao usuário
 aws iam list-access-keys --user-name "$USUARIO" --query 'AccessKeyMetadata[].[AccessKeyId, Status, CreateDate]' --output text | awk '{printf("[%s : %s]\n", "Access Key ID", $1)}'
-
-
-
-
