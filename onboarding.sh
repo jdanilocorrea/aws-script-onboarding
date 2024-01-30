@@ -27,29 +27,10 @@ function add_user_to_group {
   fi
 }
 
-# Função para criar acesso ao console AWS com senha gerada automaticamente
-function create_console_access {
-  display_message "Adicionando acesso ao console AWS para o usuário $1..."
-  AUTOSENHA=$(openssl rand -base64 12 | tr -dc 'a-zA-Z0-9' | fold -w 1 | shuf | head -n 1)$(openssl rand -base64 11)
-  LOGIN_PROFILE=$(aws iam create-login-profile --user-name "$1" --password-reset-required --password "$AUTOSENHA" 2>/dev/null)
-  if [ -n "$LOGIN_PROFILE" ]; then
-    display_message "Senha gerada para o usuário $1 com sucesso."
-    USER_CONSOLE=$(echo "$LOGIN_PROFILE" | jq -r '.LoginProfile.UserName')
-    PASSWORD_CONSOLE=$(echo "$LOGIN_PROFILE" | jq -r '.LoginProfile.Password')
-
-    echo "==Exibir os resultados==================="
-    echo "Usuário: $USER_CONSOLE"
-    echo "Senha: $PASSWORD_CONSOLE"
-    SENHA=$AUTOSENHA
-  else
-    display_message "Falha ao gerar senha para o usuário $1."
-  fi
-}
-
-# Função para exibir acesso do usuário e baixar arquivo CSV
+# Função para exibir acesso do usuário e baixar arquivo
 function display_and_download {
   echo "-------------------DOWNLOAD-------------------------------"
-  display_message "Exibindo acesso e baixando arquivo CSV..."
+  display_message "Exibindo acesso e criando arquivo..."
   echo -e "Acesso ao Console AWS:"
   echo -e "Usuário: $1\nSenha: $2\nGrupo: $3"
   if aws iam list-access-keys --user-name "$1" 2>/dev/null; then
@@ -63,6 +44,27 @@ function display_and_download {
     display_message "Falha ao gerar arquivo CSV para o usuário $1."
   fi
   echo "-----------------------------------------------------------"
+}
+
+# Função para criar acesso ao console AWS com senha gerada automaticamente
+function create_console_access {
+  display_message "Adicionando acesso ao console AWS para o usuário $1..."
+  AUTOSENHA=$(openssl rand -base64 12 | tr -dc 'a-zA-Z0-9' | fold -w 1 | shuf | head -n 1)$(openssl rand -base64 11)
+  LOGIN_PROFILE=$(aws iam create-login-profile --user-name "$1" --password-reset-required --password "$AUTOSENHA" 2>/dev/null)
+  if [ -n "$LOGIN_PROFILE" ]; then
+    display_message "Senha gerada para o usuário $1 com sucesso."
+    USER_CONSOLE=$(echo "$LOGIN_PROFILE" | jq -r '.LoginProfile.UserName')
+    PASSWORD_CONSOLE=$(echo "$LOGIN_PROFILE" | jq -r '.LoginProfile.Password')
+    echo "============================================"
+    echo "=============AWS CONSOLE ENABLED============"
+    echo "============================================"
+    echo "==========Usuário: $USER_CONSOLE============"
+    echo "==========Senha: $PASSWORD_CONSOLE=========="
+    echo "============================================"
+    display_and_download "$1" "$AUTOSENHA" "$2"
+  else
+    display_message "Falha ao gerar senha para o usuário $1."
+  fi
 }
 
 # Função para criar acesso ao AWS CLI para o usuário
@@ -114,8 +116,9 @@ GRUPO="$2"
 # Executar as funções
 create_user "$USUARIO"
 add_user_to_group "$USUARIO" "$GRUPO"
-SENHA=$(create_console_access "$USUARIO")
-display_and_download "$USUARIO" "$SENHA" "$GRUPO"
+create_console_access "$USUARIO" "$GRUPO"
+echo "wait to..."
+sleep 5ource
 create_cli_access "$USUARIO"
 display_cli_and_download "$USUARIO"
 
