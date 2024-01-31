@@ -268,9 +268,11 @@ GRUPO="$2"
 # Executar as funções
 create_user "$USUARIO"
 add_user_to_group "$USUARIO" "$GRUPO"
+echo "Wait to..."
+sleep 5
 create_console_access "$USUARIO"
 echo "Wait to..."
-sleep 3
+sleep 5
 create_cli_access "$USUARIO"
 
 echo ""
