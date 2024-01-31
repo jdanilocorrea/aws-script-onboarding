@@ -108,6 +108,7 @@ function get_console_access {
 
 
 
+
 # Função para criar acesso ao console AWS com senha gerada automaticamente
 function create_console_access {
   echo "------------CREATE CONSOLE ACCESS--------------------------"
