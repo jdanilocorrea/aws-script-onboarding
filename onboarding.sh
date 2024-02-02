@@ -256,14 +256,34 @@ function create_cli_access {
 
 
 # Verificar número de argumentos
-if [ "$#" -ne 2 ]; then
+if [ "$#" -ne 3 ]; then
     echo "Uso: $0 <USUARIO> <GRUPO>"
     exit 1
+fi
+
+echo "Conferir valores inseridos..." 
+echo  ""
+echo "Usuario: $1"
+echo ""
+echo "Grupo: $2"
+echo ""
+echo "Profile: $3"
+echo ""
+
+echo "Pressione Enter para continuar ou 'c' para cancelar: \c"
+read input
+
+
+# Verificar a entrada do usuário
+if [[ "$input" == "c" ]]; then
+    echo "Operação cancelada pelo usuário."
+    exit 1  # Sai do script com código de erro 1 (ou o código que você preferir)
 fi
 
 # Parâmetros do script
 USUARIO="$1"
 GRUPO="$2"
+export AWS_DEFAULT_PROFILE="$3"
 
 # Executar as funções
 create_user "$USUARIO"
@@ -291,4 +311,4 @@ echo "       ------------------------"
 echo ""
 # Listar Access Key ID associada ao usuário
 aws iam list-access-keys --user-name "$USUARIO" --query 'AccessKeyMetadata[].[AccessKeyId, Status, CreateDate]' --output text | awk '{printf("[%s : %s]\n", "Access Key ID", $1)}'
-
+unset AWS_DEFAULT_PROFILE
