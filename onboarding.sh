@@ -10,7 +10,7 @@ function display_message {
 # Função para criar usuário
 function create_user {
   display_message "Criando usuário $1..."
-  if aws iam create-user --user-name "$1" 2>/dev/null; then
+  if awslocal iam create-user --user-name "$1" 2>/dev/null; then
     
     display_message "Usuário $1 criado com sucesso."
   else
@@ -23,7 +23,7 @@ function create_user {
 # Função para adicionar usuário a um grupo existente
 function add_user_to_group {
   display_message "Adicionando usuário $1 ao grupo $2..."
-  if aws iam add-user-to-group --user-name "$1" --group-name "$2" 2>/dev/null; then
+  if awslocal iam add-user-to-group --user-name "$1" --group-name "$2" 2>/dev/null; then
     display_message "Usuário $1 adicionado ao grupo $2 com sucesso."
   else
     display_message "Falha ao adicionar usuário $1 ao grupo $2."
@@ -36,12 +36,11 @@ function mfa_attach_user_policy {
   local AWS_CONSOLE="$2"
   local ARN_AWS_IAM_POLICY
 
-  # ARN_AWS_IAM_POLICY=$(aws iam list-policies --query 'Policies[?PolicyName==`SelfManageMFADevice`].Arn' --output text)
   
-  ARN_AWS_IAM_POLICY=$(aws iam list-policies --query "Policies[?PolicyName==\`SelfManageMFADevice\`].Arn" --output text)
+  ARN_AWS_IAM_POLICY=$(awslocal iam list-policies --query "Policies[?PolicyName==\`SelfManageMFADevice\`].Arn" --output text)
 
   if [[ "$AWS_CONSOLE" == "pnb-hml" || "$AWS_CONSOLE" == "pnb-prd" ]]; then
-    aws iam attach-user-policy --user-name "$USER_NAME" --policy-arn "$ARN_AWS_IAM_POLICY"
+    awslocal iam attach-user-policy --user-name "$USER_NAME" --policy-arn "$ARN_AWS_IAM_POLICY"
     display_message "A política 'SelfManageMFADevice' foi adicionada ao usuário $USER_NAME - $AWS_CONSOLE com sucesso."
   else
     display_message "Não foi possível adicionar a política 'SelfManageMFADevice' - Console $AWS_CONSOLE não reconhecido."
@@ -53,7 +52,7 @@ function mfa_attach_user_policy {
 
 # Função para buscar informações de acesso ao console
 function get_console_access {
-  ACCOUNT_ALIAS=$(aws iam list-account-aliases --query 'AccountAliases[0]' --output text)
+  ACCOUNT_ALIAS=$(awslocal iam list-account-aliases --query 'AccountAliases[0]' --output text)
 
   case "$ACCOUNT_ALIAS" in
     "pnb-hml")
@@ -62,6 +61,9 @@ function get_console_access {
     "pnb-prd")
       CONSOLE_URL="https://pnb-prd.signin.aws.amazon.com/console"
       ;;
+    "None")
+      CONSOLE_URL="https://None.signin.aws.amazon.com/console"
+      ;;  
     # Adicione mais casos conforme necessário
     *)
       display_message "Console Access não reconhecido para alias '$ACCOUNT_ALIAS'."
@@ -85,40 +87,16 @@ function get_console_access {
 }
 
 
-
-# # Função para exibir acesso do usuário e baixar arquivo
-# function display_and_download {
-#   echo "------------DOWNLOAD CONSOLE ACCESS------------------------"
-#   display_message "Exibindo acesso e criando arquivo..."
-#   echo "" > "$2"-console-aws-acesso.txt
-#   echo -e "Acesso ao Console AWS:" | tee -a "$2"-console-aws-acesso.txt
-#   echo -e "Console URL:$1 \nUsuário: $2\nSenha: $3" | tee -a "$2"-console-aws-acesso.txt
-#   if aws iam list-access-keys --user-name "$2" 2>/dev/null; then
-#     display_message "Chaves de acesso listadas com sucesso."
-#   else
-#     display_message "Falha ao listar chaves de acesso para o usuário $2."
-#   fi
-#   # if aws iam create-login-profile --user-name "$1" --password-reset-required --query 'LoginProfile.[UserName, LoginProfile.Password, LoginProfile.CreateDate]' --output csv > usuario_acesso.csv 2>/dev/null; then
-#   #   display_message "Arquivo CSV gerado com sucesso."
-#   # else
-#   #   display_message "Falha ao gerar arquivo para o usuário $1."
-#   # fi
-
-# }
-
-
-
-
 # Função para criar acesso ao console AWS com senha gerada automaticamente
 function create_console_access {
   echo "------------CREATE CONSOLE ACCESS--------------------------"
   display_message "Adicionando acesso ao console AWS para o usuário $1..."
   AUTOSENHA=$(openssl rand -base64 12 | tr -dc 'a-zA-Z0-9' | fold -w 1 | shuf | head -n 1)$(openssl rand -base64 11)
-  LOGIN_PROFILE=$(aws iam create-login-profile --user-name "$1" --password-reset-required --password "$AUTOSENHA" 2>/dev/null)
+  LOGIN_PROFILE=$(awslocal iam create-login-profile --user-name "$1" --password-reset-required --password "$AUTOSENHA" 2>/dev/null)
   if [ -n "$LOGIN_PROFILE" ]; then
     display_message "Senha gerada para o usuário $1 com sucesso."
 
-    ACCOUNT_ALIAS=$(aws iam list-account-aliases --query 'AccountAliases[0]' --output text)
+    ACCOUNT_ALIAS=$(awslocal iam list-account-aliases --query 'AccountAliases[0]' --output text)
     CONSOLE_URL="https://$ACCOUNT_ALIAS.signin.aws.amazon.com/console"
     USER_CONSOLE=$(echo "$LOGIN_PROFILE" | jq -r '.LoginProfile.UserName')
     # PASSWORD_CONSOLE=$(echo "$LOGIN_PROFILE" | jq -r '.LoginProfile.Password')
@@ -150,7 +128,7 @@ function create_console_access {
 # Função para buscar informações das crendênciais
 function get-credentials {
 
-  ACCOUNT_ALIAS=$(aws iam list-account-aliases --query 'AccountAliases[0]' --output text)
+  ACCOUNT_ALIAS=$(awslocal iam list-account-aliases --query 'AccountAliases[0]' --output text)
   CONSOLE_URL="$ACCOUNT_ALIAS"
   
   if [[ "$CONSOLE_URL" == "pnb-hml" ]]; then
@@ -188,6 +166,16 @@ function get-credentials {
       echo "" 
       } >> credentials
 
+  elif [[ "$CONSOLE_URL" == "None" ]]; then
+
+      display_message "Gerar informações arquivo 'credentials' usuário $1 - pnb-prd."  
+      {
+      echo "[none]" 
+      echo "aws_access_key_id = $1" 
+      echo "aws_secret_access_key = $2" 
+      echo "" 
+      } >> credentials    
+
   else
 
       # Adicione outra condição conforme necessário
@@ -197,30 +185,13 @@ function get-credentials {
 }
 
 
-
-# # Função para exibir acesso ao AWS CLI e baixar arquivo CSV
-# function display_cli_and_download {
-#   echo "------------DOWNLOAD AWS-CLI ACCESS-------------------------"
-#   display_message "Exibindo acesso ao AWS CLI e baixando arquivo..."
-#   echo "" > "$1"-aws-cli-acesso.txt
-#   echo -e "Acesso ao AWS CLI:" | tee -a "$1"-aws-cli-acesso.txt
-#   echo -e "Usuário: $1\nChave de Acesso: $(aws configure get aws_access_key_id --profile "$1" 2>/dev/null)\nChave Secreta: $(aws configure get aws_secret_access_key --profile "$1" 2>/dev/null)" | tee -a "$1"-aws-cli-acesso.txt
-  
-#   # if aws configure list-profiles --output table --profile "$1" > usuario_acesso_cli.csv 2>/dev/null; then
-#   #   display_message "Arquivo do AWS CLI gerado com sucesso."
-#   # else
-#   #   display_message "Falha ao gerar arquivo CSV do AWS CLI para o usuário $1."
-#   # fi
-# }
-
-
 # Função para criar acesso ao AWS CLI para o usuário
 function create_cli_access {
   echo "------------CREATE AWS-CLI ACCESS---------------------------"
   display_message "Criando acesso ao AWS CLI para o usuário $1..."
   
   # Chama o comando uma vez e armazena o resultado nas variáveis
-  ACCESS_KEY_ID=$(aws iam create-access-key --user-name "$1" --query 'AccessKey.[AccessKeyId,SecretAccessKey]' --output text 2>/dev/null)
+  ACCESS_KEY_ID=$(awslocal iam create-access-key --user-name "$1" --query 'AccessKey.[AccessKeyId,SecretAccessKey]' --output text 2>/dev/null)
 
   if [ -n "$ACCESS_KEY_ID" ]; then
     # Extrai a access key e a secret key do resultado
@@ -228,8 +199,8 @@ function create_cli_access {
     SECRET_KEY=$(echo "$ACCESS_KEY_ID" | cut -f2)
 
     # Configura as credenciais no perfil do AWS CLI
-    if aws configure set aws_access_key_id "$ACCESS_KEY" --profile "$1" && \
-       aws configure set aws_secret_access_key "$SECRET_KEY" --profile "$1"; then
+    if awslocal configure set aws_access_key_id "$ACCESS_KEY" --profile "$1" && \
+       awslocal configure set aws_secret_access_key "$SECRET_KEY" --profile "$1"; then
         display_message "Chaves de acesso do AWS CLI configuradas com sucesso."
       
          echo "============================================"
@@ -253,37 +224,77 @@ function create_cli_access {
 }
 
 
+# Passo 1: Solicitar informações do usuário
+echo -n "Insira o nome do usuário a ser criado: "
+read -r USUARIO
+
+# # Passo 2: Listar grupos existentes
+# echo "Grupos existentes:"
+# read -r -a groups <<<"$(awslocal iam list-groups --query 'Groups[*].GroupName' --output text)"
+# #mapfile -t groups < <(awslocal iam list-groups --query 'Groups[*].GroupName' --output text)
+# #groups=($(awslocal iam list-groups --query 'Groups[*].GroupName' --output text))
+# for ((i = 0; i <= ${#groups[@]}; i++)); do
+#     echo "[$i]: ${groups[$i]}"
+# done
+# echo -n "Escolha um número para o grupo do usuário: "
+# read -r group_number
 
 
-# Verificar número de argumentos
-if [ "$#" -ne 3 ]; then
-    echo "Uso: $0 <USUARIO> <GRUPO>"
-    exit 1
+# Passo 2: Listar grupos existentes
+echo "Grupos existentes:"
+read -r -a groups <<<"$(awslocal iam list-groups --query 'Groups[*].GroupName' --output text)"
+#mapfile -t groups < <(awslocal iam list-groups --query 'Groups[*].GroupName' --output text)
+#groups=($(awslocal iam list-groups --query 'Groups[*].GroupName' --output text))
+for ((i = 0; i <= ${#groups[@]}; i++)); do
+    echo "[$i]: ${groups[$i]}"
+done
+echo -n "Escolha um número para o grupo do usuário: "
+read -r group_number
+
+# Verificar se a opção selecionada é válida
+if [[ "$group_number" =~ ^[0-9]+$ ]] && (( group_number >= 0 && group_number <= ${#groups[@]} )); then
+    # Obter o nome do grupo com base no número escolhido
+    GRUPO=${groups[$group_number]}
+else
+    echo "Opção inválida selecionada. Por favor, escolha um número válido."
+    return 
 fi
 
-echo "Conferir valores inseridos..." 
-echo  ""
-echo "Usuario: $1"
-echo ""
-echo "Grupo: $2"
-echo ""
-echo "Profile: $3"
-echo ""
+
+
+
+
+echo "Escolha uma opção:"
+echo "[1] default"
+echo "[2] psd-hml"
+echo "[3] psd-prd"
+echo "[4] localstack"
+# Lê a escolha do usuário
+echo -n "Digite o número da sua escolha: "
+read -r environment_choice
+
+# Verifica a escolha do usuário
+case $environment_choice in
+    1) environment="default" ;;
+    2) environment="psd-hml" ;;
+    3) environment="psd-prd" ;;
+    4) environment="localstack" ;;
+    *) echo "Opção inválida. Saindo."; return ;;
+esac
+
+echo "Você escolheu a opção: $environment"
+
+export AWS_DEFAULT_PROFILE="$environment"
 
 echo "Pressione Enter para continuar ou 'c' para cancelar: \c"
-read input
+read -r input
 
 
 # Verificar a entrada do usuário
 if [[ "$input" == "c" ]]; then
     echo "Operação cancelada pelo usuário."
-    exit 1  # Sai do script com código de erro 1 (ou o código que você preferir)
-fi
-
-# Parâmetros do script
-USUARIO="$1"
-GRUPO="$2"
-export AWS_DEFAULT_PROFILE="$3"
+    return  # Sai do script com código de erro 1 (ou o código que você preferir)
+else
 
 # Executar as funções
 create_user "$USUARIO"
@@ -310,5 +321,7 @@ echo "       Chaves de Acesso AWS CLI"
 echo "       ------------------------"
 echo ""
 # Listar Access Key ID associada ao usuário
-aws iam list-access-keys --user-name "$USUARIO" --query 'AccessKeyMetadata[].[AccessKeyId, Status, CreateDate]' --output text | awk '{printf("[%s : %s]\n", "Access Key ID", $1)}'
+awslocal iam list-access-keys --user-name "$USUARIO" --query 'AccessKeyMetadata[].[AccessKeyId, Status, CreateDate]' --output text | awk '{printf("[%s : %s]\n", "Access Key ID", $1)}'
 unset AWS_DEFAULT_PROFILE
+
+fi
